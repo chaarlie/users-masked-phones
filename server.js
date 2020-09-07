@@ -3,7 +3,6 @@ const Router = require('koa-router');
 const NodeCache = require( "node-cache" );
 
 const { users: {find} } = require('./db/');
-const phoneMasking = require('./util/phoneMasking');
 
 const app = new Koa();
 const router = new Router({prefix: '/api/v1'});
@@ -21,19 +20,18 @@ router.get('/users', async (ctx) => {
   if(masking) {
     users = caching.get('users-masked');
     if(!users) {
-      users = await find();
-      users = users.map((u) => Object.assign({}, {...u, phone: phoneMasking(u.phone)}));
+      users =  await find('', { stream: true, masked: true });
       caching.set('users-masked', users);
     }
   }
   else {
     users = caching.get('users');
     if(!users) {
-      users = await find();
+      users = await find('', {stream: true});
       caching.set('users', users);
     }
   }
-
+  
   ctx.body = users;
 });
 

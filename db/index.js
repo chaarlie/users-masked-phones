@@ -1,6 +1,7 @@
-const { Readable } = require('stream');
+const fs = require('fs');
 
 const users = require('./users.json');
+const phoneMasking = require('../util/phoneMasking');
 
 module.exports = {
 	users: {
@@ -17,24 +18,41 @@ module.exports = {
  * @return     {(Promise|Readable)}
  */
 function dbFindUsers(filter, opts) {
-	opts = opts || {};
+	const { masked, stream } = opts || {};
+ 
+	if (stream) {
+		return new Promise((resolve, reject) => {
+			let data = [];
+			let streamedUsers = [];
+			
+			// eslint-disable-next-line no-undef
+			const readerStream = fs.createReadStream(__dirname + '/users.json'); 
 
-	if (opts.stream) {
-		const dbStream = new Readable({ objectMode: true });
-		const buf = users.map(v => ({ ...v }));
+			readerStream.on('data', chunk => {
+				data.push(chunk);
+			});
+			readerStream.on('end', () => {
+				const str = data.reduce((prev, next) => prev += next);
 
-		dbStream._read = function() {
-			const data = buf.shift() || null;
-			this.push(data);
-		};
+				streamedUsers = JSON.parse(str);
 
-		return dbStream;
+				if(masked) {
+					streamedUsers = streamedUsers.map((u) => Object.assign({...u, phone: phoneMasking(u.phone)} ));	
+				}
+
+				resolve(streamedUsers);
+			});
+			readerStream.on('error', function(err) {
+				reject(err.stack);
+			});
+		})
 	}
+	else {
+		return new Promise((resolve) => {
+			const networkDelay = Math.floor(Math.random() * 300);
+			const result = users.map(v => ({ ...v }));
 
-	return new Promise((resolve) => {
-		const networkDelay = Math.floor(Math.random() * 300);
-		const result = users.map(v => ({ ...v }));
-
-		setTimeout(() => resolve(result), networkDelay);
-	});
+			setTimeout(() => resolve(result), networkDelay);
+		});
+	}
 }
